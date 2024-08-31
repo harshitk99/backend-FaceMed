@@ -56,7 +56,18 @@ function authorize(role) {
 app.post('/upload', upload.single('photo'), async (req, res) => {
     try {
         const { name, password, emergencyContact, bloodGroup, allergies, pastSurgery, otherMedicalConditions } = req.body;
+        if (!name || !password || !emergencyContact || !bloodGroup || !req.file) {
+            return res.status(400).send('All fields are required.');
+        }
+        if (password.length < 6) {
+            return res.status(400).send('Password must be at least 6 characters long.');
+        }
         const hashedPassword = await bcrypt.hash(password, 10);
+        const existingUser = await User.findOne({ password: hashedPassword });
+
+        if (existingUser) {
+            return res.status(400).send('This password is already in use. Please choose a different one.');
+        }
         const newUser = new User({
             name,
             password: hashedPassword,
@@ -83,8 +94,17 @@ app.post('/register-professional', async (req, res) => {
             return res.status(400).send('All fields are required.');
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        if (password.length < 6) {
+            return res.status(400).send('Password must be at least 6 characters long.');
+        }
 
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const existingProfessional = await Professional.findOne({ password: hashedPassword });
+
+        if (existingProfessional) {
+            return res.status(400).send('This password is already in use. Please choose a different one.');
+        }
+        
         const newProfessional = new Professional({
             name,
             contact,
@@ -92,13 +112,13 @@ app.post('/register-professional', async (req, res) => {
             affiliatedHospital,
             password: hashedPassword
         });
-
         await newProfessional.save();
         res.status(201).send('Medical professional registered successfully');
     } catch (error) {
         res.status(500).send('Error registering professional: ' + error.message);
     }
 });
+
 
 // POST /login endpoint
 app.post('/login', async (req, res) => {
