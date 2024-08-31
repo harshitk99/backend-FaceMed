@@ -24,10 +24,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_DB_URL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-});
+mongoose.connect(process.env.MONGO_DB_URL);
 
 // Load Face-API models
 faceapi.nets.ssdMobilenetv1.loadFromDisk(path.join(__dirname, 'models'));
