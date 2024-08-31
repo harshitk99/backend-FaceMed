@@ -174,8 +174,8 @@ app.post('/update', authenticateJWT, authorize('user'), upload.single('photo'), 
     }
 });
 
-// GET /verify endpoint (Restricted to medical professionals)
-app.get('/verify', authenticateJWT, authorize('professional'), upload.single('photo'), async (req, res) => {
+// POST /verify endpoint (Restricted to medical professionals)
+app.post('/verify', authenticateJWT, authorize('professional'), upload.single('photo'), async (req, res) => {
     try {
         if (!req.file || !req.file.buffer) {
             return res.status(400).send('No photo provided or invalid file.');
