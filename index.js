@@ -18,6 +18,8 @@ faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+
 
 // Multer setup for file uploads
 const storage = multer.memoryStorage();
@@ -62,12 +64,15 @@ app.post('/upload', upload.single('photo'), async (req, res) => {
         if (password.length < 6) {
             return res.status(400).send('Password must be at least 6 characters long.');
         }
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const existingUser = await User.findOne({ password: hashedPassword });
+
+        // Check if a user with the same emergency contact already exists
+        const existingUser = await User.findOne({ emergencyContact });
 
         if (existingUser) {
-            return res.status(400).send('This password is already in use. Please choose a different one.');
+            return res.status(400).send('A user with this emergency contact already exists.');
         }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
             name,
             password: hashedPassword,
@@ -90,27 +95,28 @@ app.post('/register-professional', async (req, res) => {
     try {
         const { name, contact, doctorId, affiliatedHospital, password } = req.body;
 
+        // Check if required fields are present
         if (!name || !contact || !doctorId || !affiliatedHospital || !password) {
             return res.status(400).send('All fields are required.');
         }
 
-        if (password.length < 6) {
-            return res.status(400).send('Password must be at least 6 characters long.');
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const existingProfessional = await Professional.findOne({ password: hashedPassword });
+        // Check if the professional already exists based on unique fields
+        const existingProfessional = await Professional.findOne({ doctorId });
 
         if (existingProfessional) {
-            return res.status(400).send('This password is already in use. Please choose a different one.');
+            return res.status(400).send('A professional with this Doctor ID already exists.');
         }
-        
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create and save the new professional
         const newProfessional = new Professional({
             name,
             contact,
             doctorId,
             affiliatedHospital,
-            password: hashedPassword
+            password: hashedPassword,
         });
         await newProfessional.save();
         res.status(201).send('Medical professional registered successfully');
@@ -118,7 +124,6 @@ app.post('/register-professional', async (req, res) => {
         res.status(500).send('Error registering professional: ' + error.message);
     }
 });
-
 
 // POST /login endpoint
 app.post('/login', async (req, res) => {
