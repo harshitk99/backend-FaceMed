@@ -57,19 +57,21 @@ function authorize(role) {
 // POST /upload endpoint (User registration)
 app.post('/upload', upload.single('photo'), async (req, res) => {
     try {
-        const { name, password, emergencyContact, bloodGroup, allergies, pastSurgery, otherMedicalConditions } = req.body;
-        if (!name || !password || !emergencyContact || !bloodGroup || !req.file) {
+        const { name, password, emergencyContact, bloodGroup, allergies, pastSurgery, otherMedicalConditions, aadharNumber } = req.body;
+        
+        if (!name || !password || !emergencyContact || !bloodGroup || !req.file || !aadharNumber) {
             return res.status(400).send('All fields are required.');
         }
+        
         if (password.length < 6) {
             return res.status(400).send('Password must be at least 6 characters long.');
         }
 
-        // Check if a user with the same emergency contact already exists
-        const existingUser = await User.findOne({ emergencyContact });
+        // Check if a user with the same Aadhaar number already exists
+        const existingUser = await User.findOne({ aadharNumber });
 
         if (existingUser) {
-            return res.status(400).send('A user with this emergency contact already exists.');
+            return res.status(400).send('A user with this Aadhaar number already exists.');
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -81,6 +83,7 @@ app.post('/upload', upload.single('photo'), async (req, res) => {
             allergies,
             pastSurgery,
             otherMedicalConditions,
+            aadharNumber,
             photo: req.file.buffer
         });
         await newUser.save();
@@ -127,18 +130,30 @@ app.post('/register-professional', async (req, res) => {
 
 // POST /login endpoint
 app.post('/login', async (req, res) => {
-    const { name, password, role } = req.body;
+    const { password, role, doctorId, aadharNumber } = req.body;
     const model = role === 'professional' ? Professional : User;
+    const additionalField = role === 'professional' ? { doctorId } : { aadharNumber };
 
-    const user = await model.findOne({ name });
-    if (!user) return res.status(400).send('User not found');
+    try {
+        const user = await model.findOne({ ...additionalField });
 
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) return res.status(400).send('Invalid password');
+        if (!user) {
+            return res.status(400).send('User not found or invalid credentials');
+        }
 
-    const token = jwt.sign({ id: user._id, role: role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+            return res.status(400).send('Invalid password');
+        }
+
+        // Generate a JWT token
+        const token = jwt.sign({ id: user._id, role: role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    } catch (error) {
+        res.status(500).send('Server error: ' + error.message);
+    }
 });
+
 
 // GET /userData endpoint (User login and get data)
 app.get('/userData', authenticateJWT, authorize('user'), async (req, res) => {
