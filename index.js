@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./db/User');
 const Professional = require('./db/professional');
@@ -19,7 +18,6 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
-
 
 // Multer setup for file uploads
 const storage = multer.memoryStorage();
@@ -74,10 +72,9 @@ app.post('/upload', upload.single('photo'), async (req, res) => {
             return res.status(400).send('A user with this Aadhaar number already exists.');
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
             name,
-            password: hashedPassword,
+            password,
             emergencyContact,
             bloodGroup,
             allergies,
@@ -110,16 +107,13 @@ app.post('/register-professional', async (req, res) => {
             return res.status(400).send('A professional with this Doctor ID already exists.');
         }
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
         // Create and save the new professional
         const newProfessional = new Professional({
             name,
             contact,
             doctorId,
             affiliatedHospital,
-            password: hashedPassword,
+            password, // Store plaintext password
         });
         await newProfessional.save();
         res.status(201).send('Medical professional registered successfully');
@@ -141,8 +135,8 @@ app.post('/login', async (req, res) => {
             return res.status(400).send('User not found or invalid credentials');
         }
 
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
+        // Compare plaintext passwords
+        if (password !== user.password) {
             return res.status(400).send('Invalid password');
         }
 
@@ -153,7 +147,6 @@ app.post('/login', async (req, res) => {
         res.status(500).send('Server error: ' + error.message);
     }
 });
-
 
 // GET /userData endpoint (User login and get data)
 app.get('/userData', authenticateJWT, authorize('user'), async (req, res) => {
@@ -174,7 +167,7 @@ app.get('/userData', authenticateJWT, authorize('user'), async (req, res) => {
     }
 });
 
-//maybe include update.
+// POST /update endpoint (User data update)
 app.post('/update', authenticateJWT, authorize('user'), upload.single('photo'), async (req, res) => {
     try {
         const { emergencyContact, bloodGroup, allergies, pastSurgery, otherMedicalConditions } = req.body;
